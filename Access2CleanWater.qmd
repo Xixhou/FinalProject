@@ -1,0 +1,197 @@
+---
+title: "Access to Clean Water Services in the Caribbean"
+author: "Nernst-Atwood Raphael"
+format: dashboard
+---
+
+```{python}
+import pandas as pd
+import plotly.express as px
+import itables
+import streamlit as st
+
+
+# Load the data
+def load_data():
+    water_rural_raw = pd.read_csv("data/water_rural.csv")
+    water_urban_raw = pd.read_csv("data/water_urban.csv")
+
+    water_rural_long = water_rural_raw.melt(
+        id_vars=["country"], var_name="year", value_name="percent_rural"
+    )
+    water_urban_long = water_urban_raw.melt(
+        id_vars=["country"], var_name="year", value_name="percent_urban"
+    )
+
+    for df in [water_rural_long, water_urban_long]:
+        df["year"] = pd.to_numeric(df["year"], errors="coerce")
+        df.iloc[:, 2] = pd.to_numeric(df.iloc[:, 2], errors="coerce")
+
+    # Merge datasets
+    water_final = pd.merge(
+        water_rural_long, water_urban_long, on=["country", "year"], how="inner"
+    )
+    selected_countries = [
+        "Cuba",
+        "Dominican Republic",
+        "Haiti",
+        "Jamaica",
+        "Puerto Rico",
+    ]
+    return water_final[water_final["country"].isin(selected_countries)]
+
+
+# Load Data
+water_final = load_data()
+
+# Compute Key Statistics
+
+# Find the country and corresponding percentage for highest and lowest access to water services
+highest_percent_rural_country = water_final.loc[
+    water_final["percent_rural"].idxmax(), "country"
+]
+highest_percent_rural = water_final["percent_rural"].max()
+
+highest_percent_urban_country = water_final.loc[
+    water_final["percent_urban"].idxmax(), "country"
+]
+highest_percent_urban = water_final["percent_urban"].max()
+
+lowest_percent_rural_country = water_final.loc[
+    water_final["percent_rural"].idxmin(), "country"
+]
+lowest_percent_rural = water_final["percent_rural"].min()
+
+lowest_percent_urban_country = water_final.loc[
+    water_final["percent_urban"].idxmin(), "country"
+]
+lowest_percent_urban = water_final["percent_urban"].min()
+
+
+# Create the map visualization
+map_fig = px.choropleth(
+    water_final.groupby("country").mean().reset_index(),
+    locations="country",
+    locationmode="country names",
+    color="percent_urban",
+    title="Percentage of the Urban Population With at Least Basic Water Services",
+    color_continuous_scale="Reds",
+).update_layout(coloraxis_showscale=False)
+
+# Percentage of Population with Access to Water Services Over Time (Line Chart)
+fig1 = px.line(
+    water_final,
+    x="year",
+    y="percent_rural",
+    color="country",
+    title="Percentage of the Rural Population With at Least Basic Water Services",
+)
+
+fig2 = px.line(
+    water_final,
+    x="year",
+    y="percent_urban",
+    color="country",
+    title="Percentage of the Urban Population With at Least Basic Water Services",
+)
+
+# Scatter Plot (Urban Rate vs Rural)
+fig3 = px.scatter(
+    water_final,
+    x="percent_rural",
+    y="percent_urban",
+    color="country",
+    title="Percentage of the Population With at Least Basic Water Services: Urban vs. Rural",
+    trendline="ols",
+)
+```
+
+# HOME
+
+## Row 1 {height=30%}
+::: {.valuebox icon="flag" color="#90EE90" title="Country with the Highest Urban Access to Basic Water Services"}  
+`{python} f"{highest_percent_urban_country}: {highest_percent_urban:.2f}%"`  
+:::  
+
+::: {.valuebox icon="flag" color="#E57373" title="Country with the Highest Rural Access to Basic Water Services"}  
+`{python} f"{highest_percent_rural_country}: {highest_percent_rural:.2f}%"`  
+:::  
+
+::: {.valuebox icon="exclamation-triangle" color="#FFB74D" title="Country with the Lowest Rural Access to Basic Water Services"}  
+`{python} f"{lowest_percent_rural_country}: {lowest_percent_rural:.2f}%"`  
+:::  
+
+::: {.valuebox icon="exclamation-triangle" color="#FFB6C1" title="Country with the Lowest Urban Access to Basic Water Services"}  
+`{python} f"{lowest_percent_urban_country}: {lowest_percent_urban:.2f}%"`  
+:::  
+
+## Row 2 {height=60%}
+
+### {width=70%}
+
+```{python}
+map_fig
+```
+
+### {width=40%}
+
+```{python}
+fig1
+```
+
+# REGIONAL
+
+## Row 1 {height=30%}
+
+```{python}
+# Create regional summary
+reg_sum = (
+    water_final.groupby("country")
+    .apply(
+        lambda g: pd.Series(
+            {
+                "Average Percentage": g["percent_urban"].mean(),
+                "Lowest Percentage": g["percent_urban"].min(),
+                "Year with Lowest Percentage": g.loc[g["percent_urban"].idxmin(), "year"] if g["percent_urban"].notna().any() else None,
+                "Highest Percentage": g["percent_urban"].max(),
+                "Year with Highest Percentage": g.loc[g["percent_urban"].idxmax(), "year"] if g["percent_urban"].notna().any() else None,
+            }
+        )
+    )
+    .round(2)
+)
+
+itables.show(reg_sum)
+```
+
+## Row 2 {height=70%}
+
+### Column {width="80%"}
+
+```{python}
+fig2
+```
+
+### Column {width="20%"}
+
+Access to water services varies significantly across Caribbean nations. Some countries have made steady improvements in water infrastructure, while others have faced challenges due to socioeconomic factors and environmental conditions.
+
+# DATA DOWNLOAD
+
+```{python}
+# Display full dataset with itables
+itables.show(
+    water_final,
+    caption="Access to Clean Water Services (Caribbean)",
+    buttons=["csvHtml5"],
+)
+```
+
+# ABOUT
+
+This data is sourced from global water access statistics, focusing on Caribbean nations. Understanding these trends is crucial for implementing effective water infrastructure policies and interventions.
+
+**Watch a related TED Talk on Access to Clean Water:**
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/t9JY4OGhRg8" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
